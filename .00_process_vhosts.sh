@@ -1,5 +1,26 @@
 #!/bin/bash
 
+INCLUDE_SSL_FILE="/etc/nginx/conf.d/ssl.conf;"
+INCLUDE_SSL_CERT="/etc/letsencrypt/live/%s/fullchain.pem;"
+INCLUDE_SSL_CERT_KEY="/etc/letsencrypt/live/%s/privkey.pem;"
+
+SSL_NOT_ADDED="./ssl_not_added"
+rm ${SSL_NOT_ADDED}
+touch ${SSL_NOT_ADDED}
+echo "SERVER_NAME:ROOT:SSL" > ${SSL_NOT_ADDED}
+
+TO_ADD_SSL="./to_add_ssl"
+rm ${TO_ADD_SSL}
+touch ${TO_ADD_SSL}
+echo "SERVER_NAME:ROOT:SSL" > ${TO_ADD_SSL}
+
+SSL_FAILED="./ssl_failed"
+rm ${SSL_FAILED}
+touch ${SSL_FAILED}
+echo "SERVER_NAME:ROOT:SSL" > ${SSL_FAILED}
+
+ADD_SSL_CMD="./certbot certonly --email certs.infraestructura@e-ducativa.com --no-self-upgrade --webroot -w %s -d %s"
+
 . resty
 resty http://127.0.0.1:8081/nginx/vhosts/
 VHOSTS=`GET /| jq -cr '.[]'`
@@ -56,8 +77,26 @@ is_ssl() {
 	
 }
 
+copy_include_ssl (){
+	local vhost=$1
+	local uri=$2
+	#local index=$2
+	#echo "index...." ${vhost} ${index}
+	
+	SSL_CERT=`printf "${INCLUDE_SSL_CERT}" "${uri}"`
+	SSL_CERT_KEY=`printf "${INCLUDE_SSL_CERT_KEY}" "${uri}"`
+	
+	#add ssl include
+	ssl=`echo ${vhost} | jq --arg ssl_file ${INCLUDE_SSL_FILE} '.include |= . + [$ssl_file]'`
+	cert=`echo ${ssl} | jq --arg ssl_cert ${SSL_CERT} '.ssl_certificate = $ssl_cert'`
+	key=`echo ${cert} | jq --arg ssl_cert_key ${SSL_CERT_KEY} '.ssl_certificate_key = $ssl_cert_key'`
+	#echo ${ssl}
+	echo ${key}
+}
 process_vhost (){
 	local vhost=$1
+	local uri=$2
+	
 	type=`echo ${vhost} | jq -cr '. | type'`
 	
 	if [ ${type} == 'array' ]; then
@@ -65,10 +104,10 @@ process_vhost (){
 		length=`echo ${vhost} | jq '.|length'`
 		#echo ${length}
 		index=0
-		
 		while [ ${index} -lt ${length} ]; do
 			#echo The counter is ${index}
-			vhost=`GET /${i}/${index}`
+			#echo "I ${uri}"
+			vhost=`GET /${uri}/${index}`
 			
 			server_name=$( get_value "${vhost}" "server_name" )
 			root=$( get_value "${vhost}" "root" )
@@ -77,7 +116,19 @@ process_vhost (){
 			
 			#si no tiene ssl & tiene un root, podemos hacer el certificado
 			if [ ${is_ssl} -lt 1 -a ${root} != "null" ]; then
-				echo "${server_name}:${root}:${is_ssl}"
+				echo "${server_name}:${root}:${is_ssl}" >> ${TO_ADD_SSL}
+				cmd_exec=`printf "${ADD_SSL_CMD}" "${server_name}" "${root}"`
+				echo "executing.... "${cmd_exec}
+				cmd_status=`${cmd_exec}`
+				echo ${cmd_status}
+				if [ ${cmd_status} -ne 0 ]; then
+					echo "${server_name}:${root}:${is_ssl}" >> ${SSL_FAILED}
+				else
+					copy_include_ssl "${vhost}" "${uri}"
+				fi
+			else
+				echo "${server_name}:${root}:${is_ssl}" >> ${SSL_NOT_ADDED}
+			
 			fi
 			
 			let index=index+1
@@ -92,17 +143,29 @@ process_vhost (){
 		
 		#si no tiene ssl & tiene un root, podemos hacer el certificado
 		if [ ${is_ssl} -lt 1 -a ${root} != "null" ]; then
-			echo "${server_name}:${root}:${is_ssl}"
+			echo "${server_name}:${root}:${is_ssl}" >> ${TO_ADD_SSL}
+			cmd_exec=`printf "${ADD_SSL_CMD}" "${server_name}" "${root}"`
+			echo "executing.... "${cmd_exec}
+			cmd_status=`${cmd_exec}`
+			echo ${cmd_status}
+			if [ ${cmd_status} -ne 0 ]; then
+				echo "${server_name}:${root}:${is_ssl}" >> ${SSL_FAILED}
+			else
+				copy_include_ssl "${vhost}" "${uri}"
+			fi
+				
+		else
+			echo "${server_name}:${root}:${is_ssl}" >> ${SSL_NOT_ADDED}
 		fi
 		
 	fi
 }
 
-for i in ${VHOSTS[@]}; do
+for uri in ${VHOSTS[@]}; do
 	
-	vhost=`GET /${i}`
+	vhost=`GET /${uri}`
 	
-	process_vhost "${vhost}"
+	process_vhost "${vhost}" "${uri}"
 	
 done
 
