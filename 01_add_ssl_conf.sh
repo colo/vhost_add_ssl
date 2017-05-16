@@ -8,6 +8,15 @@ TO_ADD_SSL="./to_add_ssl"
 . resty
 resty 'http://127.0.0.1:8081/nginx/vhosts/' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
 
+NGINX_DIR="/home/colo/projects/node-mngr-api/devel/etc/nginx"
+BACKUP_DIR="/home/colo/projects/node-mngr-api/devel/etc/.nginx-"`date +%F_%T`
+
+echo "Backing up Nginx Conf dir: ${NGINX_DIR}"
+echo "To: ${BACKUP_DIR}"
+cp -a ${NGINX_DIR} ${BACKUP_DIR}
+
+
+
 get_value (){
 	local vhost=$1
 	local property=$2
@@ -60,13 +69,18 @@ include_ssl_conf (){
 		#ssl_conf=`echo ${vhost} | jq -rc --arg ssl_file ${INCLUDE_SSL_FILE} '.include |= . + [$ssl_file]'`
 		ssl_conf=`echo ${vhost} | jq --arg ssl_file ${INCLUDE_SSL_FILE} '.include |= . + [$ssl_file]'`
 		ssl_conf=`echo ${ssl_conf} | jq -rc --arg ssl_file ${INCLUDE_SSL_FILE} '. |{ include: .include }'`
-		echo ${uri}
+		#echo ${uri}
 		#echo ${vhost}
-		echo ${ssl_conf}
+		#echo ${ssl_conf}
 		echo "Saving ${uri}/${index}"
 		saved_vhost=`PUT /${uri}/${index} ${ssl_conf}`
-		#saved_vhost=`GET /${uri}/${index}`
-		#echo $saved_vhost | jq -Rrc '.'
+		if [ $? -eq 0 ]; then
+			#echo $saved_vhost | jq -Rrc '.'
+			echo 'OK!'
+		else
+			echo "Probkem saving, server returned:"
+			echo $saved_vhost | jq -Rrc '.'
+		fi
 	fi
 	
 	
@@ -75,6 +89,7 @@ include_ssl_conf (){
 process_uri (){
 	local uri=$1
 	local index=$2
+	local root=$3
 	
 	#echo "GET /${uri}/${index}"
 
@@ -85,30 +100,21 @@ process_uri (){
 	if [ ${type} == 'array' ]; then
 		echo "error, shouldn't be an array at all"
 		exit -1
-		##no se procesar el array con jc, así q hago nuevamente el GET pero con indice
-		#length=`echo ${vhost} | jq '.|length'`
-		##echo ${length}
-		#index=0
-		#while [ ${index} -lt ${length} ]; do
-			##echo The counter is ${index}
-			##echo "I ${uri}"
-			#vhost=`GET /${uri}/${index}`
-			
-			#include_ssl_conf "${vhost}" "${uri}/${index}"
-			
-			#let index=index+1
-		#done
-		
 	else
 		include_ssl_conf "${vhost}" "${uri}" "${index}"
 	fi
 }
 
-while IFS=':' read -r uri root index; do
+while IFS=':' read -r uri index root; do
   
-  process_uri "${uri}" "${index}"
+  process_uri "${uri}" "${index}" "${root}"
   
 done <${TO_ADD_SSL}
+
+
+echo "Now check nginx conf with: "
+echo "nginx -t -c ${NGINX_DIR}/nginx.conf; service nginx reload"
+echo "and the run 02_create_ssl.sh"
 
 exit 0
 

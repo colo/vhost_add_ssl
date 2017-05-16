@@ -14,7 +14,7 @@ touch ${TO_ADD_SSL}
 
 
 . resty
-resty http://127.0.0.1:8081/nginx/vhosts/
+resty 'http://127.0.0.1:8081/nginx/vhosts/' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
 VHOSTS=`GET /| jq -cr '.[]'`
 
 get_value (){
@@ -59,37 +59,38 @@ is_ssl() {
 		if [ ${ssl_certificate_key} = "null" ]; then
 			echo 0
 		else
-			includes=$( get_json_value "${vhost}" "include" )
-			type=`echo ${includes} | jq -cr '.|type'`
+			echo 1
+			#includes=$( get_json_value "${vhost}" "include" )
+			#type=`echo ${includes} | jq -cr '.|type'`
+			
+			##if [ ${type} == 'array' ]; then
+				###ssl=`echo ${includes} | jq -cr '.|if map(contains("/etc/nginx/conf.d/ssl.conf") == true then halt end)'`
+				##ssl=`echo ${vhost} | jq --arg ssl_file ${INCLUDE_SSL_FILE} '.include|map(contains($ssl_file))' | egrep -c 'true'`
+				###ssl=`echo ${includes} | jq --arg ssl_file ${INCLUDE_SSL_FILE} -cr '.|map(contains($ssl_file))' | egrep -c 'true'`
+				
+			##else
+				##ssl=`echo ${includes} | jq -cr '.|map(contains("/etc/nginx/conf.d/ssl.conf"))' | egrep -c 'true'`
+			##fi
+			##echo "${includes}|${type}"
+			
 			
 			#if [ ${type} == 'array' ]; then
-				##ssl=`echo ${includes} | jq -cr '.|if map(contains("/etc/nginx/conf.d/ssl.conf") == true then halt end)'`
-				#ssl=`echo ${vhost} | jq --arg ssl_file ${INCLUDE_SSL_FILE} '.include|map(contains($ssl_file))' | egrep -c 'true'`
-				##ssl=`echo ${includes} | jq --arg ssl_file ${INCLUDE_SSL_FILE} -cr '.|map(contains($ssl_file))' | egrep -c 'true'`
-				
+				#ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -cr '.|map(contains($ssl_file))' | egrep -c 'true'`
+			#elif [ ${type} == 'string' ]; then
+				##echo "TYPE STRING: "${type}
+				#ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -cr '.|contains($ssl_file)' | egrep -c 'true'`
 			#else
-				#ssl=`echo ${includes} | jq -cr '.|map(contains("/etc/nginx/conf.d/ssl.conf"))' | egrep -c 'true'`
+				##echo "TYPE NULL: "${type}
+				#ssl=0
 			#fi
-			#echo "${includes}|${type}"
 			
+			##echo "SSL: ${ssl}"
 			
-			if [ ${type} == 'array' ]; then
-				ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -cr '.|map(contains($ssl_file))' | egrep -c 'true'`
-			elif [ ${type} == 'string' ]; then
-				#echo "TYPE STRING: "${type}
-				ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -cr '.|contains($ssl_file)' | egrep -c 'true'`
-			else
-				#echo "TYPE NULL: "${type}
-				ssl=0
-			fi
-			
-			#echo "SSL: ${ssl}"
-			
-			if [ ${ssl} -ne 0 ]; then
-				echo 1
-			else 
-				echo 0
-			fi
+			#if [ ${ssl} -ne 0 ]; then
+				#echo 1
+			#else 
+				#echo 0
+			#fi
 			
 			
 		fi
@@ -99,7 +100,7 @@ is_ssl() {
 	
 }
 
-process_uri (){
+process_vhost (){
 	local uri=$1
 	
 	vhost=`GET /${uri}`
@@ -125,9 +126,10 @@ process_uri (){
 			
 			#si no tiene ssl & tiene un root, podemos hacer el certificado
 			if [ ${is_ssl} -lt 1 -a ${root} != "null" ]; then
-				echo "${server_name}:${root}:${index}" >> ${TO_ADD_SSL}
+				echo "${server_name}/${index} needs ssl"
+				echo "${server_name}:${index}:${root}" >> ${TO_ADD_SSL}
 			else
-				echo "${server_name}:${root}:${index}" >> ${SSL_NOT_ADDED}
+				echo "${server_name}:${index}:${root}" >> ${SSL_NOT_ADDED}
 			
 			fi
 			
@@ -143,9 +145,10 @@ process_uri (){
 		
 		#si no tiene ssl & tiene un root, podemos hacer el certificado
 		if [ ${is_ssl} -lt 1 -a ${root} != "null" ]; then
-			echo "${server_name}:${root}:0" >> ${TO_ADD_SSL}
+			echo "${server_name}/0 needs ssl"
+			echo "${server_name}:0:${root}" >> ${TO_ADD_SSL}
 		else
-			echo "${server_name}:${root}:0" >> ${SSL_NOT_ADDED}
+			echo "${server_name}:0:${root}" >> ${SSL_NOT_ADDED}
 		fi
 		
 	fi
@@ -155,7 +158,7 @@ for uri in ${VHOSTS[@]}; do
 	
 	#vhost=`GET /${uri}`
 	
-	process_uri "${uri}"
+	process_vhost "${uri}"
 	
 done
 
