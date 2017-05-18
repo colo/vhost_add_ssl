@@ -26,11 +26,11 @@ get_value (){
 	local property=$2
 	
 	#puede ser de typo array si incluyó un comentario
-	result=`echo ${vhost} | jq --arg property "${property}" -cr '.[$property]|type'`
+	result=`echo ${vhost} | jq --arg property "${property}" -c -r '.[$property]|type'`
 	if [ ${result} == 'object' ]; then
-		result=`echo ${vhost} | jq --arg property "${property}" -cr '.[$property]|._value'`
+		result=`echo ${vhost} | jq --arg property "${property}" -c -r '.[$property]|._value'`
 	else
-		result=`echo ${vhost} | jq --arg property "${property}" -cr '.[$property]'`
+		result=`echo ${vhost} | jq --arg property "${property}" -c -r '.[$property]'`
 	fi
 	
 	echo ${result}
@@ -41,7 +41,7 @@ get_json_value (){
 	local property=$2
 	
 	#puede ser de typo array si incluyó un comentario
-	result=`echo ${vhost} | jq --arg property "${property}" -cr '.[$property]|type'`
+	result=`echo ${vhost} | jq --arg property "${property}" -c -r '.[$property]|type'`
 	if [ ${result} == 'object' ]; then
 		result=`echo ${vhost} | jq --arg property "${property}" -c '.[$property]|._value'`
 	else
@@ -79,6 +79,8 @@ process_vhost (){
 	
 	type=`echo ${vhost} | jq -cr '. | type'`
 	
+	
+	
 	if [ ${type} == 'array' ]; then
 		#no se procesar el array con jc, así q hago nuevamente el GET pero con indice
 		length=`echo ${vhost} | jq '.|length'`
@@ -109,7 +111,27 @@ process_vhost (){
 		done
 		
 	else
-		server_name=$( get_value "${vhost}" "server_name" )
+		server_name=$( get_json_value "${vhost}" "server_name" )
+		
+		#echo ${server_name} | jq -Rcr '. | type'
+		
+		type=`echo ${server_name} | jq -cr '. | type'`
+		
+		#si tiene varios server names en un mismo vhost, utilizamos la uri...los demás server_names no se pierden,
+		#ya que serán llamados nuevamente porque la lista inicial incluye todo y cada uno de los server_name en 
+		# todos los vhosts
+		#
+		# de hecho es la forma correcta de procesarlos, ya que es necesario procesar cada uno de los servers_names
+		# y generarles vhosts individuales, porque cada uno debe tener sus archivos de CERT y KEY
+		if [ ${type} == 'array' ]; then
+			echo "ARRAY"
+			server_name=${uri}
+		else
+			server_name=$( get_value "${vhost}" "server_name" )
+		fi
+		
+		
+		
 		root=$( get_value "${vhost}" "root" )
 		is_ssl=$( is_ssl "${vhost}" )
 		
@@ -132,33 +154,33 @@ include_ssl_conf (){
 	local index=$3
 	
 	includes=$( get_json_value "${vhost}" "include" )
-	type=`echo ${includes} | jq -cr '.|type'`
+	type=`echo ${includes} | jq -c -r '.|type'`
 	
 	if [ ${type} == 'array' ]; then
-		ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -cr '.|map(contains($ssl_file))' | egrep -c 'true'`
+		ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -c -r '.|map(contains($ssl_file))' | egrep -c 'true'`
 	elif [ ${type} == 'string' ]; then
 		#echo "TYPE STRING: "${type}
-		ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -cr '.|contains($ssl_file)' | egrep -c 'true'`
+		ssl=`echo ${includes} | jq --arg ssl_file "${INCLUDE_SSL_FILE}" -c -r '.|contains($ssl_file)' | egrep -c 'true'`
 	else
 		#echo "TYPE NULL: "${type}
 		ssl=0
 	fi
 			
 	if [ ${ssl} -eq 0 ]; then
-		#ssl_conf=`echo ${vhost} | jq -rc --arg ssl_file ${INCLUDE_SSL_FILE} '.include |= . + [$ssl_file]'`
+		#ssl_conf=`echo ${vhost} | jq -r -c --arg ssl_file ${INCLUDE_SSL_FILE} '.include |= . + [$ssl_file]'`
 		ssl_conf=`echo ${vhost} | jq --arg ssl_file ${INCLUDE_SSL_FILE} '.include |= . + [$ssl_file]'`
-		ssl_conf=`echo ${ssl_conf} | jq -rc --arg ssl_file ${INCLUDE_SSL_FILE} '. |{ include: .include }'`
+		ssl_conf=`echo ${ssl_conf} | jq -r -c --arg ssl_file ${INCLUDE_SSL_FILE} '. |{ include: .include }'`
 		#echo ${uri}
 		#echo ${vhost}
 		#echo ${ssl_conf}
 		echo "Saving ${uri}/${index}"
 		saved_vhost=`PUT /${uri}/${index} ${ssl_conf}`
 		if [ $? -eq 0 ]; then
-			#echo $saved_vhost | jq -Rrc '.'
+			#echo $saved_vhost | jq -R -r -c '.'
 			echo 'OK!'
 		else
 			echo "Probkem saving, server returned:"
-			echo $saved_vhost | jq -Rrc '.'
+			echo $saved_vhost | jq -R -r -c '.'
 		fi
 	fi
 	
@@ -174,7 +196,7 @@ process_uri (){
 
 	vhost=`GET /${uri}/${index}`
 	
-	type=`echo ${vhost} | jq -cr '. | type'`
+	type=`echo ${vhost} | jq -c -r '. | type'`
 	
 	if [ ${type} == 'array' ]; then
 		echo "error, shouldn't be an array at all"
@@ -193,7 +215,7 @@ process_uri_ssl (){
 
 	vhost=`GET /${uri}/${index}`
 	
-	type=`echo ${vhost} | jq -cr '. | type'`
+	type=`echo ${vhost} | jq -c -r '. | type'`
 	
 	if [ ${type} == 'array' ]; then
 		echo "error, shouldn't be an array at all"
@@ -230,7 +252,7 @@ create_ssl_vhost (){
 	
 	ssl=`echo ${vhost} | jq --arg listen "${listen}" '.listen = $listen'`
 	cert=`echo ${ssl} | jq --arg ssl_cert ${SSL_CERT} '.ssl_certificate = $ssl_cert'`
-	key=`echo ${cert} | jq -rc --arg ssl_cert_key ${SSL_CERT_KEY} '.ssl_certificate_key = $ssl_cert_key'`
+	key=`echo ${cert} | jq -r -c --arg ssl_cert_key ${SSL_CERT_KEY} '.ssl_certificate_key = $ssl_cert_key'`
 	
 	#echo ${ssl}
 	echo "Saving NEW SSL Vhost ${uri}"
@@ -238,7 +260,7 @@ create_ssl_vhost (){
 	saved_vhost=`echo ${key} | POST /${uri} -q 'dir=ssl'`
 	
 	if [ $? -eq 0 ]; then
-		#echo $saved_vhost | jq -Rrc '.'
+		#echo $saved_vhost | jq -R -r -c '.'
 		echo 'OK!...adding 80 port redirect...'
 		redirect=`echo ${vhost} | jq --arg listen "${listen_address}:80" '.|{ listen: $listen, server_name: .server_name, rewrite: "^   https://$host$request_uri? permanent" }'`
 		#echo ${redirect}
@@ -249,11 +271,11 @@ create_ssl_vhost (){
 			echo 'Done!'
 		else
 			echo "Probkem saving redirect, server returned:"
-			echo ${saved_vhost} | jq -Rrc '.'
+			echo ${saved_vhost} | jq -R -r -c '.'
 		fi
 	else
 		echo "Probkem saving, server returned:"
-		echo ${saved_redirect} | jq -Rrc '.'
+		echo ${saved_redirect} | jq -R -r -c '.'
 	fi
 }
 
@@ -261,7 +283,7 @@ create_cert(){
 	local uri=$1
 	local root=$2
 	
-	cmd_exec=`printf "${ADD_SSL_CMD}" "${uri}" "${root}"`
+	cmd_exec=`printf "${ADD_SSL_CMD}" "${root}" "${uri}"`
 	#echo "executing.... "${cmd_exec}
 	cmd_status=`${cmd_exec}`
 	echo ${cmd_status}
