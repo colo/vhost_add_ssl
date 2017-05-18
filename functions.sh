@@ -88,7 +88,7 @@ process_vhost (){
 	
 	vhost=`GET /${uri}`
 	
-	type=`echo ${vhost} | jq -cr '. | type'`
+	type=`echo ${vhost} | jq -c -r '. | type'`
 	
 	
 	
@@ -126,7 +126,7 @@ process_vhost (){
 		
 		#echo ${server_name} | jq -Rcr '. | type'
 		
-		type=`echo ${server_name} | jq -cr '. | type'`
+		type=`echo ${server_name} | jq -c -r '. | type'`
 		
 		#si tiene varios server names en un mismo vhost, utilizamos la uri...los demás server_names no se pierden,
 		#ya que serán llamados nuevamente porque la lista inicial incluye todo y cada uno de los server_name en 
