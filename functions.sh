@@ -7,7 +7,7 @@ gawk="/usr/bin/gawk"
 . resty
 resty 'http://127.0.0.1:8081/nginx/vhosts/' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
 #production
-#resty 'http://127.0.0.1:8081/nginx/vhosts/enabled/' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
+#resty 'http://127.0.0.1:8081/nginx/vhosts/enabled' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
 
 SSL_NOT_ADDED="./ssl_not_added"
 TO_ADD_SSL="./to_add_ssl"
