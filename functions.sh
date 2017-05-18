@@ -271,6 +271,8 @@ create_ssl_vhost (){
 	saved_vhost=`echo ${key} | POST /${uri} -q 'dir=ssl'`
 	
 	if [ $? -eq 0 ]; then
+		#"security" messure to avoid nodejs writing on the same file concurrently
+		sleep 1
 		#echo $saved_vhost | jq -R -r -c '.'
 		echo 'OK!...adding 80 port redirect...'
 		redirect=`echo ${vhost} | jq --arg listen "${listen_address}:80" '.|{ listen: $listen, server_name: .server_name, rewrite: "^   https://$host$request_uri? permanent" }'`
