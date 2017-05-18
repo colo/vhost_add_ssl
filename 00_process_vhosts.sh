@@ -8,7 +8,7 @@ touch ${SSL_NOT_ADDED}
 rm ${TO_ADD_SSL}
 touch ${TO_ADD_SSL}
 
-VHOSTS=`GET /| jq -cr '.[]'`
+VHOSTS=`GET /| jq -c -r '.[]'`
 
 for uri in ${VHOSTS[@]}; do
 	
