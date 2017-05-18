@@ -1,9 +1,13 @@
 #!/bin/bash
 
 gawk="/usr/bin/gawk"
+#production - debian
+#gawk="/usr/bin/awk"
 
 . resty
 resty 'http://127.0.0.1:8081/nginx/vhosts/' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
+#production
+#resty 'http://127.0.0.1:8081/nginx/vhosts/enabled/' -Z -v -H "Accept: application/json" -H "Content-Type: application/json" 
 
 SSL_NOT_ADDED="./ssl_not_added"
 TO_ADD_SSL="./to_add_ssl"
@@ -13,6 +17,13 @@ INCLUDE_SSL_FILE="/etc/nginx/conf.d/ssl.conf"
 
 NGINX_DIR="/home/colo/projects/node-mngr-api/devel/etc/nginx"
 BACKUP_DIR="/home/colo/projects/node-mngr-api/devel/etc/.nginx-"`date +%F_%T`
+BACKUP_DIR_SSL="/home/colo/projects/node-mngr-api/devel/etc/.nginx_ssl-"`date +%F_%T`
+
+#production
+#NGINX_DIR="/etc/nginx"
+#BACKUP_DIR="/var/backups/.nginx-"`date +%F_%T`
+#BACKUP_DIR_SSL="/var/backups/.nginx_ssl-"`date +%F_%T`
+
 
 INCLUDE_SSL_CERT="/etc/letsencrypt/live/%s/fullchain.pem"
 INCLUDE_SSL_CERT_KEY="/etc/letsencrypt/live/%s/privkey.pem"

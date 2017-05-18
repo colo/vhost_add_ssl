@@ -8,12 +8,9 @@ touch ${CERT_FAILED}
 rm ${SSL_FAILED}
 touch ${SSL_FAILED}
 
-#override BACKUP_DIR
-BACKUP_DIR="/home/colo/projects/node-mngr-api/devel/etc/.nginx_ssl-"`date +%F_%T`
-
 echo "Backing up Nginx Conf dir: ${NGINX_DIR}"
-echo "To: ${BACKUP_DIR}"
-cp -a ${NGINX_DIR} ${BACKUP_DIR}
+echo "To: ${BACKUP_DIR_SSL}"
+cp -a ${NGINX_DIR} ${BACKUP_DIR_SSL}
 
 while IFS=':' read -r uri index root; do
   
