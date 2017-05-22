@@ -296,10 +296,16 @@ create_cert(){
 	local uri=$1
 	local root=$2
 	
-	cmd_exec=`printf "${ADD_SSL_CMD}" "${root}" "${uri}"`
-	#echo "executing.... "${cmd_exec}
-	cmd_status=`${cmd_exec}`
-	echo ${cmd_status}
+	SSL_CERT=`printf "${INCLUDE_SSL_CERT}" "${uri}"`
 	
+	if [ -a ${SSL_CERT} ]; then
+		#if cert exist, do nothing
+		echo 0
+	else
+		cmd_exec=`printf "${ADD_SSL_CMD}" "${root}" "${uri}"`
+		#echo "executing.... "${cmd_exec}
+		cmd_status=`${cmd_exec}`
+		echo ${cmd_status}
+	fi
 
 }
