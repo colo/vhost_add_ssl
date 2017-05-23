@@ -266,30 +266,35 @@ create_ssl_vhost (){
 	key=`echo ${cert} | jq -r -c --arg ssl_cert_key ${SSL_CERT_KEY} '.ssl_certificate_key = $ssl_cert_key'`
 	
 	#echo ${ssl}
-	echo "Saving NEW SSL Vhost ${uri}"
-	
-	saved_vhost=`echo ${key} | POST /${uri} -q 'dir=ssl'`
-	
-	if [ $? -eq 0 ]; then
-		#"security" messure to avoid nodejs writing on the same file concurrently
-		sleep 1
-		#echo $saved_vhost | jq -R -r -c '.'
-		echo 'OK!...adding 80 port redirect...'
-		redirect=`echo ${vhost} | jq --arg listen "${listen_address}:80" '.|{ listen: $listen, server_name: .server_name, rewrite: "^   https://$host$request_uri? permanent" }'`
-		#echo ${redirect}
+	if [ -a ${SSL_CERT} ]; then
+		echo "Saving NEW SSL Vhost ${uri}"
 		
-		echo "Saving Vhost redirect ${uri}"
-		saved_redirect=`echo ${redirect} | POST /${uri} -q 'dir=ssl'`
+		saved_vhost=`echo ${key} | POST /${uri} -q 'dir=ssl'`
+		
 		if [ $? -eq 0 ]; then
-			echo 'Done!'
+			#"security" messure to avoid nodejs writing on the same file concurrently
+			sleep 1
+			#echo $saved_vhost | jq -R -r -c '.'
+			echo 'OK!...adding 80 port redirect...'
+			redirect=`echo ${vhost} | jq --arg listen "${listen_address}:80" '.|{ listen: $listen, server_name: .server_name, rewrite: "^   https://$host$request_uri? permanent" }'`
+			#echo ${redirect}
+			
+			echo "Saving Vhost redirect ${uri}"
+			saved_redirect=`echo ${redirect} | POST /${uri} -q 'dir=ssl'`
+			if [ $? -eq 0 ]; then
+				echo 'Done!'
+			else
+				echo "Probkem saving redirect, server returned:"
+				echo ${saved_vhost} | jq -R -r -c '.'
+			fi
 		else
-			echo "Probkem saving redirect, server returned:"
-			echo ${saved_vhost} | jq -R -r -c '.'
+			echo "Probkem saving, server returned:"
+			echo ${saved_redirect} | jq -R -r -c '.'
 		fi
 	else
-		echo "Probkem saving, server returned:"
-		echo ${saved_redirect} | jq -R -r -c '.'
+		echo "NO CERT for ${uri}, aborting..."
 	fi
+	
 }
 
 create_cert(){
