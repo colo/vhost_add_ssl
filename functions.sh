@@ -29,7 +29,10 @@ INCLUDE_SSL_CERT="/etc/letsencrypt/live/%s/fullchain.pem"
 INCLUDE_SSL_CERT_KEY="/etc/letsencrypt/live/%s/privkey.pem"
 
 ADD_SSL_CMD="./certbot certonly --email certs.infraestructura@e-ducativa.com --no-self-upgrade --webroot -w %s -d %s"
-
+#production (debian 7)
+#ADD_SSL_CMD="/usr/local/bin/certbot-auto certonly --email certs.infraestructura@e-ducativa.com --no-self-upgrade --webroot -w %s -d %s"
+#production (debian 8)
+#ADD_SSL_CMD="/usr/bin/certbot certonly --email certs.infraestructura@e-ducativa.com --no-self-upgrade --webroot -w %s -d %s"
 
 
 get_value (){
